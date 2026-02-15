@@ -354,9 +354,11 @@ public class CameraView extends FrameLayout implements LifecycleObserver {
         if (mExperimental
                 && engine == Engine.CAMERA2
                 && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            android.util.Log.i("CameraViewEngine", "Using Camera2Engine (focus distance available for PAD)");
             return new Camera2Engine(callback);
         } else {
             mEngine = Engine.CAMERA1;
+            android.util.Log.i("CameraViewEngine", "Using Camera1Engine (experimental=" + mExperimental + " engine=" + engine + ")");
             return new Camera1Engine(callback);
         }
     }

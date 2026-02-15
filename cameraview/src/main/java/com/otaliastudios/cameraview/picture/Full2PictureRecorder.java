@@ -3,12 +3,12 @@ package com.otaliastudios.cameraview.picture;
 import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraDevice;
 import android.hardware.camera2.CaptureRequest;
+import android.hardware.camera2.CaptureResult;
 import android.hardware.camera2.DngCreator;
 import android.hardware.camera2.TotalCaptureResult;
 import android.media.Image;
 import android.media.ImageReader;
 import android.os.Build;
-import android.util.Log;
 
 import com.otaliastudios.cameraview.PictureResult;
 import com.otaliastudios.cameraview.controls.PictureFormat;
@@ -42,6 +42,8 @@ public class Full2PictureRecorder extends FullPictureRecorder
     private final CaptureRequest.Builder mPictureBuilder;
 
     private DngCreator mDngCreator;
+    /** Set in onCaptureCompleted; applied to mResult in onImageAvailable before dispatch (callback order can vary). */
+    private volatile Float mPendingFocusDiopters;
 
     public Full2PictureRecorder(@NonNull PictureResult.Stub stub,
                                 @NonNull Camera2Engine engine,
@@ -94,7 +96,14 @@ public class Full2PictureRecorder extends FullPictureRecorder
                     dispatchResult();
                 }
 
-                if (mResult.format == PictureFormat.DNG) {
+                // Engine may submit still capture with tag 1 (preview); always take LENS_FOCUS_DISTANCE from any result. Last onCaptureCompleted before onImageAvailable is the one we need.
+                if (mResult != null) {
+                    Float focusDiopters = result.get(CaptureResult.LENS_FOCUS_DISTANCE);
+                    mPendingFocusDiopters = focusDiopters;
+                    mResult.focusDistanceDiopters = focusDiopters;
+                }
+
+                if (mResult != null && mResult.format == PictureFormat.DNG) {
                     mDngCreator = new DngCreator(holder.getCharacteristics(this), result);
                     mDngCreator.setOrientation(ExifHelper.getExifOrientation(mResult.rotation));
                     if (mResult.location != null) {
@@ -133,7 +142,10 @@ public class Full2PictureRecorder extends FullPictureRecorder
             }
         }
 
-        // Leave.
+        // Apply focus distance from capture result (onCaptureCompleted may run before or after this callback).
+        if (mResult != null) {
+            mResult.focusDistanceDiopters = mPendingFocusDiopters;
+        }
         LOG.i("onImageAvailable ended.");
         dispatchResult();
     }
