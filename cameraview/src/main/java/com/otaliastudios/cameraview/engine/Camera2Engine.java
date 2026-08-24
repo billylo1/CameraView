@@ -270,6 +270,16 @@ public class Camera2Engine extends CameraBaseEngine implements
                         "state:", getState(),
                         "targetState:", getTargetState());
                 throw new CameraException(CameraException.REASON_DISCONNECTED);
+            } catch (IllegalArgumentException e) {
+                // CaptureRequest targets a Surface that is not part of the current session
+                // (stale surface after orientation restart / video teardown). Wrap so the
+                // engine treats it as a recoverable CameraException instead of crashing.
+                LOG.e("applyRepeatingRequestBuilder: unconfigured surface!", e,
+                        "checkStarted:", checkStarted,
+                        "currentThread:", Thread.currentThread().getName(),
+                        "state:", getState(),
+                        "targetState:", getTargetState());
+                throw new CameraException(e, errorReason);
             }
         }
     }
@@ -631,6 +641,13 @@ public class Camera2Engine extends CameraBaseEngine implements
         }
 
         LOG.i("onStartPreview:", "Starting preview.");
+        // Recreate the builder so targets cannot linger from a prior TEMPLATE_RECORD /
+        // failed video session (would throw "unconfigured Input/Output Surface").
+        try {
+            createRepeatingRequestBuilder(getRepeatingRequestDefaultTemplate());
+        } catch (CameraAccessException e) {
+            throw createCameraException(e);
+        }
         addRepeatingRequestBuilderSurfaces();
         applyRepeatingRequestBuilder(false,
                 CameraException.REASON_FAILED_TO_START_PREVIEW);

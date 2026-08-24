@@ -2376,6 +2376,12 @@ public class CameraView extends FrameLayout implements LifecycleObserver {
             if (isOpened()) {
                 // We can't handle display offset (View angle) changes without restarting.
                 // See comments in OrientationHelper for more information.
+                // Stop an in-flight video first: close/open mid-record leaves CaptureRequest
+                // targets that are not in the new session ("unconfigured Input/Output Surface").
+                if (isTakingVideo()) {
+                    LOG.w("onDisplayOffsetChanged", "stopping video before restart.");
+                    stopVideo();
+                }
                 LOG.w("onDisplayOffsetChanged", "restarting the camera.");
                 close();
                 open();
